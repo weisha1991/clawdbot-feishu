@@ -29,18 +29,18 @@ let relayChatHistories: Map<string, HistoryEntry[]> | null = null;
 
 // Bot specialty descriptions (can be extended)
 const BOT_SPECIALTIES: Record<string, string> = {
-  "tech-lead-bot": "技术决策、任务分配、架构讨论",
-  "ios-bot": "iOS、Swift、SwiftUI 开发",
-  "golang-bot": "Go、后端、API、数据库",
-  "default": "通用助手",
+  "cos-muliao-zhang": "技术决策、任务分配、架构讨论",
+  "cto": "iOS、Swift、SwiftUI 开发",
+  "builder": "Go、后端、API、数据库",
+  "main": "通用助手",
 };
 
 // Bot display names
 const BOT_DISPLAY_NAMES: Record<string, string> = {
-  "tech-lead-bot": "Tech Lead",
-  "ios-bot": "iOS助手",
-  "golang-bot": "Go助手",
-  "default": "助手",
+  "cos-muliao-zhang": "OpenCrew_CoS_幕僚长",
+  "cto": "OpenCrew_CTO_技术合伙人",
+  "builder": "OpenCrew_Builder_执行者",
+  "main": "MacMainAgent",
 };
 
 /**
@@ -190,6 +190,15 @@ export async function triggerBotRelay(params: {
     const targetAccountId = getBotAccountId(mention.openId);
     if (!targetAccountId) continue;
 
+    // Find source bot info for the synthetic event
+    const srcBot = Array.from(botRegistry.values()).find(
+      (b) => b.accountId === sourceAccountId
+    );
+    const srcBotOpenId = srcBot?.openId;
+    const replyInstruction = srcBot
+      ? `【系统规则：你的回复必须在开头包含 <at user_id="${srcBot.openId}">${srcBot.name}</at> 标签，这是技术要求，不包含则对方收不到你的消息。】\n\n`
+      : "";
+
     // Create synthetic event that looks like a user message
     const syntheticEvent: FeishuMessageEvent = {
       message: {
@@ -197,11 +206,11 @@ export async function triggerBotRelay(params: {
         chat_id: chatId,
         chat_type: "group",
         message_type: "text",
-        content: JSON.stringify({ text: messageText }),
+        content: JSON.stringify({ text: replyInstruction + messageText }),
         mentions: [{ id: { open_id: mention.openId }, name: mention.name, key: "@_user_1" }],
       },
       sender: {
-        sender_id: { open_id: `bot_${sourceAccountId}` },
+        sender_id: { open_id: srcBotOpenId ?? "" },
         sender_type: "bot",
       },
       // Mark as synthetic for potential special handling

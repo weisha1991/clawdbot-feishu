@@ -1,5 +1,5 @@
 {
-  "name": "@m1heng-clawd/feishu",
+  "name": "@m1heng-clawd/m1heng-feishu",
   "version": "0.1.14",
   "type": "module",
   "description": "OpenClaw Feishu/Lark channel plugin",

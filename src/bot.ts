@@ -766,12 +766,18 @@ export async function handleFeishuMessage(params: {
   const syntheticSourceBot = (event as any)._sourceBotName as string | undefined;
 
   // Resolve sender display name (best-effort) so the agent can attribute messages correctly.
-  const senderResult = await resolveFeishuSenderName({
-    account,
-    senderOpenId: ctx.senderOpenId,
-    log,
-  });
-  if (senderResult.name) ctx = { ...ctx, senderName: senderResult.name };
+  // For synthetic events, use the source bot name directly to avoid cross-app openId errors.
+  let senderResult: Awaited<ReturnType<typeof resolveFeishuSenderName>> = {};
+  if (isSyntheticEvent && syntheticSourceBot) {
+    ctx = { ...ctx, senderName: syntheticSourceBot };
+  } else {
+    senderResult = await resolveFeishuSenderName({
+      account,
+      senderOpenId: ctx.senderOpenId,
+      log,
+    });
+    if (senderResult.name) ctx = { ...ctx, senderName: senderResult.name };
+  }
 
   // Track permission error to inform agent later (with cooldown to avoid repetition)
   let permissionErrorForAgent: PermissionError | undefined;
