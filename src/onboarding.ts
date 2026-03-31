@@ -1,17 +1,18 @@
 import type {
-  ChannelOnboardingAdapter,
-  ChannelOnboardingDmPolicy,
   ClawdbotConfig,
+} from "openclaw/plugin-sdk";
+import type {
+  ChannelSetupWizardAdapter as ChannelOnboardingAdapter,
+  ChannelSetupDmPolicy as ChannelOnboardingDmPolicy,
   DmPolicy,
   WizardPrompter,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/setup";
 import {
   addWildcardAllowFrom,
-  DEFAULT_ACCOUNT_ID,
-  formatDocsLink,
-  normalizeAccountId,
-  promptAccountId,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/setup";
+import { promptAccountId } from "openclaw/plugin-sdk/matrix";
+import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "openclaw/plugin-sdk/account-id";
+import { formatDocsLink } from "openclaw/plugin-sdk/setup";
 
 import {
   listFeishuAccountIds,

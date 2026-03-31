@@ -3,9 +3,9 @@ import * as http from "http";
 import {
   type ClawdbotConfig,
   type RuntimeEnv,
-  type HistoryEntry,
-  installRequestBodyLimitGuard,
 } from "openclaw/plugin-sdk";
+import type { HistoryEntry } from "openclaw/plugin-sdk/reply-history";
+import { installRequestBodyLimitGuard } from "openclaw/plugin-sdk/infra-runtime";
 import type { ResolvedFeishuAccount } from "./types.js";
 import { createFeishuWSClient, createEventDispatcher } from "./client.js";
 import { resolveFeishuAccount, listEnabledFeishuAccounts } from "./accounts.js";

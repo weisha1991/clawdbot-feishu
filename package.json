@@ -59,14 +59,14 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^2.1.8",
     "@types/node": "^25.0.10",
-    "openclaw": "2026.2.13",
+    "@vitest/coverage-v8": "^4.1.2",
+    "openclaw": "2026.3.24",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.2"
   },
   "peerDependencies": {
-    "openclaw": ">=2026.2.13"
+    "openclaw": ">=2026.3.24"
   }
 }

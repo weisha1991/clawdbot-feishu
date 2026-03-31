@@ -8,7 +8,7 @@ This is a Feishu/Lark (飞书) plugin for [OpenClaw](https://github.com/openclaw
 
 It provides:
 - Feishu channel integration (receive events, route messages, send replies/media/cards)
-- Feishu tool integrations (`feishu_doc`, `feishu_app_scopes`, `feishu_wiki`, `feishu_drive`, `feishu_perm`, `feishu_bitable`)
+- Feishu tool integrations (`feishu_doc`, `feishu_wiki`, `feishu_drive`, `feishu_perm`, `feishu_bitable`, `feishu_task`)
 
 ## Development
 
@@ -20,6 +20,21 @@ npm install
 
 # Type check
 npx tsc --noEmit
+
+# Run unit tests
+npm run test:unit
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run a single test file
+npx vitest run src/__tests__/mention.test.ts
+
+# Run tests in watch mode
+npm run test:unit:watch
+
+# CI check (typecheck + coverage)
+npm run ci:check
 ```
 
 ## Architecture
@@ -27,7 +42,7 @@ npx tsc --noEmit
 ### Entry Point
 - `index.ts` - Plugin registration entry
   - Registers Feishu channel plugin (`api.registerChannel`)
-  - Registers Feishu tools (doc/wiki/drive/perm/bitable)
+  - Registers Feishu tools (doc/wiki/drive/perm/bitable/task)
   - Exports public helpers (`monitorFeishuProvider`, send/media/reaction/mention utilities)
 
 ### Core Modules (src/)
@@ -45,32 +60,35 @@ npx tsc --noEmit
   - Inbound media/resource resolution
   - Optional dynamic agent creation for DMs
 - `reply-dispatcher.ts` - Agent reply dispatch (render mode `auto/raw/card`, chunking, typing indicator integration)
-- `outbound.ts` - `ChannelOutboundAdapter` implementation for text/media delivery
-
 - `send.ts` - Text messages, interactive cards, message editing
 - `media.ts` - Upload/download images and files, inbound media resource fetch
 
 **Configuration, Accounts, Policy:**
 - `config-schema.ts` - Zod schema definitions for Feishu config
-  - Includes single-account + multi-account config
-  - Includes tools toggles and dynamic agent creation config
 - `accounts.ts` - Account resolution and merged config logic (top-level defaults + account overrides)
 - `policy.ts` - DM/group allowlist and mention policy resolution
 - `tools-config.ts` - Default tool switches (`doc/wiki/drive/scopes` on, `perm` off)
 - `types.ts` - TypeScript types inferred from config/schema
 
-**Feishu Tool Modules:**
-- `docx.ts` / `doc-schema.ts` - Feishu document helpers and tool registration (`feishu_doc`, `feishu_app_scopes`)
-- `wiki.ts` / `wiki-schema.ts` - Wiki space/node operations (`feishu_wiki`)
-- `drive.ts` / `drive-schema.ts` - Drive file/folder operations (`feishu_drive`)
-- `perm.ts` / `perm-schema.ts` - Drive permission member operations (`feishu_perm`)
-- `bitable.ts` - Bitable tools entry export
-- `bitable-tools/` - Bitable modular implementation:
-  - `register.ts` tool registration + shared wrapper (`feishu_bitable_*`)
-  - `schemas.ts` tool parameter schemas
-  - `actions.ts` Feishu Bitable API operations
-  - `meta.ts` URL parsing + app/table metadata resolution
-  - `common.ts` shared types/formatting/error helpers
+**Multi-Bot Relay (experimental):**
+- `bot-relay.ts` - Bot-to-bot communication via @mentions in group chats
+  - Enables bots to trigger each other via synthetic events
+  - Provides dynamic teammate discovery for agents
+- `shared-history.ts` - Persistent cross-bot chat history storage
+  - All bots in the same group share history via `~/.openclaw/shared-history/<chatId>.jsonl`
+
+**Feishu Tool Modules (each follows `actions.ts / schemas.ts / register.ts / common.ts / index.ts` pattern):**
+- `doc-tools/` - Document read/write, markdown conversion (`feishu_doc`)
+- `wiki-tools/` - Wiki space/node operations (`feishu_wiki`)
+- `drive-tools/` - Drive file/folder operations (`feishu_drive`)
+- `perm-tools/` - Drive permission member operations (`feishu_perm`)
+- `bitable-tools/` - Bitable (多维表格) record/field operations (`feishu_bitable_*`)
+- `task-tools/` - Task v2 API operations (`feishu_task_*`)
+
+**Tool Infrastructure:**
+- `tools-common/tool-exec.ts` - Tool account resolution, client wrapper
+- `tools-common/tool-context.ts` - AsyncLocalStorage context for message-driven tools
+- `tools-common/feishu-api.ts` - Shared Feishu API helpers
 
 **Supporting Utilities:**
 - `targets.ts` - Normalize `user:xxx`/`chat:xxx` target formats
@@ -90,50 +108,43 @@ npx tsc --noEmit
 3. `bot.ts` validates policies, parses mentions/content, optionally resolves media resources.
 4. `bot.ts` dispatches to OpenClaw runtime using `reply-dispatcher.ts`.
 5. `reply-dispatcher.ts` chooses render path (`raw` text vs markdown card) and sends via `send.ts`.
-6. For outbound tool/API calls, `outbound.ts` sends text/media through `send.ts` and `media.ts`.
+
+### Skills Directory
+
+The `skills/` directory contains tool-specific documentation for agents:
+- `skills/feishu-doc/` - Document tool usage guide
+- `skills/feishu-drive/` - Drive tool usage guide
+- `skills/feishu-wiki/` - Wiki tool usage guide
+- `skills/feishu-perm/` - Permission tool usage guide
+- `skills/feishu-task/` - Task tool usage guide
 
 ### Key Configuration Options
 
 | Option | Description |
 |--------|-------------|
 | `connectionMode` | `websocket` (default) or `webhook` |
-| `webhookPath` / `webhookPort` | Webhook callback path/port when `connectionMode=webhook` |
 | `accounts` | Multi-account config map; account config overrides top-level defaults |
 | `dmPolicy` | `pairing` / `open` / `allowlist` |
-| `allowFrom` | DM allowlist (required to include `"*"` when `dmPolicy=open`) |
 | `groupPolicy` | `open` / `allowlist` / `disabled` |
-| `groupAllowFrom` | Group sender allowlist |
 | `requireMention` | Require @bot in groups (default: true) |
-| `topicSessionMode` | Group topic-thread isolation (`disabled` / `enabled`) |
 | `renderMode` | Reply render mode: `auto` / `raw` / `card` |
 | `dynamicAgentCreation` | Auto-create isolated DM agents/workspaces |
 | `tools` | Tool category switches (`doc`, `wiki`, `drive`, `perm`, `scopes`) |
-| `mediaMaxMb` | Max inbound/outbound media size limit |
 
-### Defaults and Behavior Notes
+### Defaults
 
-- `connectionMode` defaults to `websocket`.
-- `dmPolicy` defaults to `pairing`.
-- `groupPolicy` defaults to `allowlist`.
-- `requireMention` defaults to `true`.
-- `renderMode` behaves as `auto` when unset at runtime.
-- Tool defaults:
-  - `doc: true`
-  - `wiki: true`
-  - `drive: true`
-  - `perm: false` (sensitive)
-  - `scopes: true`
+- `connectionMode`: `websocket`
+- `dmPolicy`: `pairing`
+- `groupPolicy`: `allowlist`
+- `requireMention`: `true`
+- Tool defaults: `doc/wiki/drive/scopes: true`, `perm: false`
 
 ### Feishu SDK Usage
 
 Uses `@larksuiteoapi/node-sdk`. Key APIs:
-- `client.im.message.create/reply` - Send messages
-- `client.im.message.get/patch` - Read and edit messages
-- `client.im.messageResource.get` - Download media from messages
-- `client.im.image.create` - Upload images
-- `client.im.file.create` - Upload files
-- `client.docx.*` - Document read/write and markdown conversion
-- `client.wiki.*` - Wiki space/node operations
-- `client.drive.*` - Drive file and permission operations
-- `client.bitable.*` - Bitable metadata/record operations
+- `client.im.message.create/reply/get/patch` - Message operations
+- `client.im.messageResource.get` - Download media
+- `client.im.image.create / client.im.file.create` - Upload media
+- `client.docx.*` - Document operations
+- `client.wiki.*` / `client.drive.*` / `client.bitable.*` - Resource operations
 - `WSClient` + `Lark.adaptDefault(...)` - WebSocket and webhook event delivery

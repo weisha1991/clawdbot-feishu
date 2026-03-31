@@ -1,11 +1,11 @@
 import {
-  createReplyPrefixContext,
-  createTypingCallbacks,
-  logTypingFailure,
   type ClawdbotConfig,
   type ReplyPayload,
   type RuntimeEnv,
 } from "openclaw/plugin-sdk";
+import { createReplyPrefixContext } from "openclaw/plugin-sdk/feishu";
+import { createTypingCallbacks } from "openclaw/plugin-sdk/matrix";
+import { logTypingFailure } from "openclaw/plugin-sdk/channel-feedback";
 import { resolveFeishuAccount } from "./accounts.js";
 import { createFeishuClient } from "./client.js";
 import { buildMentionedCardContent, type MentionTarget } from "./mention.js";

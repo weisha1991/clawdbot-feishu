@@ -4,9 +4,9 @@ import {
   recordPendingHistoryEntryIfEnabled,
   clearHistoryEntriesIfEnabled,
   DEFAULT_GROUP_HISTORY_LIMIT,
-  resolveMentionGatingWithBypass,
   type HistoryEntry,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/reply-history";
+import { resolveMentionGatingWithBypass } from "openclaw/plugin-sdk/channel-inbound";
 import type { FeishuConfig, FeishuMessageContext, FeishuMediaInfo, ResolvedFeishuAccount } from "./types.js";
 import { getFeishuRuntime } from "./runtime.js";
 import { createFeishuClient } from "./client.js";
