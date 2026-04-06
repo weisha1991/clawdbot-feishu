@@ -31,7 +31,7 @@ import { maybeCreateDynamicAgent } from "./dynamic-agent.js";
 import { runWithFeishuToolContext } from "./tools-common/tool-context.js";
 import type { DynamicAgentCreationConfig } from "./types.js";
 // Shared history for cross-bot context
-import { recordUserMessage, buildSharedHistoryContext } from "./shared-history.js";
+import { recordUserMessage, buildSharedHistoryContext, setSharedHistoryLogger, readSharedHistory } from "./shared-history.js";
 // Bot-to-Bot relay for teammate discovery
 import { getTeammatesContext } from "./bot-relay.js";
 
@@ -750,6 +750,13 @@ export async function handleFeishuMessage(params: {
   const log = runtime?.log ?? console.log;
   const error = runtime?.error ?? console.error;
 
+  // Set up logger for shared history module
+  setSharedHistoryLogger({
+    log: runtime?.log,
+    warn: runtime?.log, // RuntimeEnv doesn't have warn, use log instead
+    error: runtime?.error,
+  });
+
   // Dedup check: skip if this message was already processed
   const messageId = event.message.message_id;
   const dedupAccountId = accountId || "default";
@@ -1216,9 +1223,33 @@ export async function handleFeishuMessage(params: {
 
     // Inject shared history (includes other bots' replies)
     if (isGroup && ctx.chatId) {
-      const sharedHistory = buildSharedHistoryContext(ctx.chatId, historyLimit, ctx.messageId);
-      if (sharedHistory) {
-        combinedBody = sharedHistory + "\n" + combinedBody;
+      // Read history to get statistics
+      const historyEntries = readSharedHistory(ctx.chatId, historyLimit);
+
+      if (historyEntries.length > 0) {
+        // Count by type
+        const userMessages = historyEntries.filter(e => e.senderType === "user").length;
+        const botMessages = historyEntries.filter(e => e.senderType === "bot").length;
+
+        // Group by bot accountId
+        const botCounts = historyEntries
+          .filter(e => e.senderType === "bot")
+          .reduce((acc, e) => {
+            const botId = e.botAccountId ?? "unknown";
+            acc[botId] = (acc[botId] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+
+        const botSummary = Object.entries(botCounts)
+          .map(([botId, count]) => `${botId}(${count})`)
+          .join(", ");
+
+        log(`shared-history: injecting ${historyEntries.length} messages (user:${userMessages}, bot:${botMessages}${botSummary ? `, bots: ${botSummary}` : ""})`);
+
+        const sharedHistory = buildSharedHistoryContext(ctx.chatId, historyLimit, ctx.messageId);
+        if (sharedHistory) {
+          combinedBody = sharedHistory + "\n" + combinedBody;
+        }
       }
     }
 

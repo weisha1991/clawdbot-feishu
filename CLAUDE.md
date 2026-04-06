@@ -74,8 +74,13 @@ npm run ci:check
 - `bot-relay.ts` - Bot-to-bot communication via @mentions in group chats
   - Enables bots to trigger each other via synthetic events
   - Provides dynamic teammate discovery for agents
+  - Trigger mechanism: `parseMentionTags()` parses `<at user_id="ou_xxx">Name</at>` from bot reply text, then `triggerBotRelay()` creates synthetic events for matched bots
+  - Bot specialty and display name are hardcoded in `BOT_SPECIALTIES` / `BOT_DISPLAY_NAMES` (requires code change to add new bots)
 - `shared-history.ts` - Persistent cross-bot chat history storage
   - All bots in the same group share history via `~/.openclaw/shared-history/<chatId>.jsonl`
+  - History is injected into agent context via `buildSharedHistoryContext()` (only in group chats)
+  - `shared-history.ts` uses `runtimeLogger` for error logging (set via `setSharedHistoryLogger()` in `bot.ts`)
+  - Known limitations: no file locking (concurrent writes may corrupt JSONL), files grow unbounded (MAX_HISTORY_ENTRIES only limits reads), JSON parse errors are logged but entries silently skipped
 
 **Feishu Tool Modules (each follows `actions.ts / schemas.ts / register.ts / common.ts / index.ts` pattern):**
 - `doc-tools/` - Document read/write, markdown conversion (`feishu_doc`)
@@ -148,3 +153,28 @@ Uses `@larksuiteoapi/node-sdk`. Key APIs:
 - `client.docx.*` - Document operations
 - `client.wiki.*` / `client.drive.*` / `client.bitable.*` - Resource operations
 - `WSClient` + `Lark.adaptDefault(...)` - WebSocket and webhook event delivery
+
+## Plugin Installation
+
+The plugin is installed to OpenClaw via link mode (directly references the source directory):
+
+```bash
+# Install from local source (link mode - code changes take effect on restart)
+openclaw plugins install /path/to/clawdbot-feishu --link
+
+# Verify installation
+openclaw plugins list | grep feishu
+openclaw plugins inspect m1heng-feishu
+```
+
+Config is stored in `~/.openclaw/openclaw.json` under `plugins.installs.m1heng-feishu`.
+
+## Multi-Bot Relay Design Notes
+
+Detailed analysis and improvement plans are documented in `docs/multi-bot-relay-improvements.md`.
+
+Key points for future development:
+- The relay trigger depends on agents outputting `<at user_id="ou_xxx">Name</at>` format — if agents don't follow this convention, relay will not fire
+- `bot-relay.ts` holds module-level global state (`botRegistry`, `relayConfig`, `relayRuntime`) that is set during `registerBotForRelay()` in `monitor.ts`
+- Synthetic events are marked with `_synthetic: true` and processed through the same `handleFeishuMessage()` path as real user events
+- Bot replies are recorded to shared history in `reply-dispatcher.ts` (only for group chats where `chatId.startsWith("oc_")`)
